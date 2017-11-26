@@ -2,17 +2,18 @@ import pandas as pd
 import numpy as np
 import os
 import tensorflow as tf
-from tensorflow.contrib.rnn import BasicRNNCell, GRUCell, BasicLSTMCell
+from tensorflow.contrib.rnn import BasicRNNCell, GRUCell, BasicLSTMCell, DropoutWrapper
 
 class QRNN(object):
 	"""docstring for QRNN"""
-	def __init__(self, timesteps, tau, lr=0.001, neurons=100,
+	def __init__(self, timesteps, tau, lr=0.001, neurons=100, keep_prob=.5, 
 				 iterations = 5000, batch_size = 50):
 		
 		self.timesteps = timesteps
 		self.tau = tau
 		self.lr = lr
 		self.neurons = neurons
+		self.keep_prob = keep_prob
 		self.iterations = iterations
 		self.batch_size = batch_size
 		self.trained = False
@@ -80,7 +81,15 @@ class QRNN(object):
 			self.tf_y = tf.placeholder(tf.float32, [None, self.timesteps, 1], name='y')
 
 			# camada recorrente
-			cell = BasicRNNCell(num_units=self.neurons, activation=tf.nn.elu)
+			cell = GRUCell(num_units=self.neurons, activation=tf.nn.elu)
+			cell = DropoutWrapper(cell,
+									input_keep_prob=1.0,
+									output_keep_prob=self.keep_prob,
+									state_keep_prob=1.0,
+									variational_recurrent=False,
+									input_size=1,
+									dtype=tf.float32)
+
 			outputs, states = tf.nn.dynamic_rnn(cell, self.tf_X, dtype=tf.float32)
 
 			# camada de saída
@@ -116,6 +125,13 @@ class QRNN(object):
 
 				# printa infos de treino
 				if step % 1000 == 0:
+					shuffle_mask = np.arange(0, X_train.shape[0]) # cria array de 0 a n_train
+					np.random.shuffle(shuffle_mask) # embaralha o array acima
+
+					# embaralha X e y consistentemente
+					X_train = X_train[shuffle_mask]
+					y_train = y_train[shuffle_mask]
+
 					train_mse = loss.eval(feed_dict={self.tf_X: X_train, self.tf_y: y_train})
 					print(step, "\tCusto de treinamento:", np.sqrt(train_mse))
 
@@ -128,23 +144,27 @@ class QRNN(object):
 		return None
 
 
-	def predict(self, X_test):
+	def predict(self, X_test, MC_steps = 20):
 		assert self.trained
 		
 		with tf.Session(graph=self.graph) as sess:
 			self.saver.restore(sess, "./tmp/QRNN.ckpt")
-			VaR = sess.run(self.net_outputs, feed_dict={self.tf_X: X_test})
+			preds = np.array([sess.run(self.net_outputs, feed_dict={self.tf_X: X_test})[:, 0, 0]
+					for _ in range(MC_steps)])
 
-		return VaR
+			pred_mean = np.mean(preds, axis=0)
+			pred_var = np.var(preds, axis=0)
+
+		return pred_mean, pred_var
 
 	def quantile_loss(self, y_true, y_hat, tau):
 		return np.mean((tau-(y_true < y_hat)) * (y_true-y_hat))
 
 	def score(self, X, y):
-		var = self.predict(X)[:, 0, 0]
-		y = y[:, 0, 0] 
-		print("#Hits: ", np.mean(y < var))
-		print("Quantile Loss: ", self.quantile_loss(y, var, self.tau))
+		var_mean, _ = self.predict(X)
+		y = y[:, 0, 0]
+		print("#Hits: ", np.mean(y < var_mean))
+		print("Quantile Loss: ", self.quantile_loss(y, var_mean, self.tau))
 
 
 def main():
