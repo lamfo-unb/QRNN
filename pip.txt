@@ -1,0 +1,6 @@
+# Add here packages that can be installed from source, use conda.txt for pre-compiled packages (like numpy, pandas, etc)
+pytest
+pytest-xdist
+pandas>=0.22.0
+numpy>=1.13.1
+

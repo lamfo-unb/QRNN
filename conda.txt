@@ -1,0 +1,6 @@
+# Add here packages that can be installed - preferably - from Anaconda repository and use pip.txt for missing packages
+pytest
+pytest-xdist
+python==3.6.3
+pandas==0.22.0
+numpy==1.13.1
