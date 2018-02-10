@@ -1,1 +1,16 @@
-__version__ = '0.0.1'
+from os.path import dirname, join
+
+
+def version():
+    """
+    Get package version
+
+    Returns
+    -------
+    version : str
+    """
+    with open(join(dirname(__file__), 'resources', 'VERSION')) as f:
+        return f.read().strip()
+
+
+__version__ = version()

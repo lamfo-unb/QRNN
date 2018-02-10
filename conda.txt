@@ -4,3 +4,4 @@ pytest-xdist
 python==3.6.3
 pandas==0.22.0
 numpy==1.13.1
+toolz==0.8.2
