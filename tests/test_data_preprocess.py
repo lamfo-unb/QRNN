@@ -25,7 +25,9 @@ def test_diff_log_pricer():
         "price2": [None, 100 * (log(1022) - log(1010)), 100 * (log(500) - log(1022)), 100 * (log(501) - log(500))]
     })
 
-    difflog_fn = diff_log_pricer(price_cols=["price1", "price2"], date_col="date")
+    difflog_fn, _ = diff_log_pricer(dataset=df_sorted,
+                                    price_columns=["price1", "price2"],
+                                    date_column="date")
 
     result_sorted = difflog_fn(df_sorted)
     result_not_sorted = difflog_fn(df_not_sorted)

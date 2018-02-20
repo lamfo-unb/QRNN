@@ -1,9 +1,8 @@
 import numpy as np
-from toolz import curry
-import pandas.api.types as ptypes
+from toolz import curry, compose, partial
 
 @curry
-def diff_log_pricer(df, price_cols, date_col):
+def diff_log_pricer(dataset, price_columns, date_column):
     """
     Splits temporal data into a training and testing datasets such that
     all training data comes before the testings one.
@@ -27,15 +26,18 @@ def diff_log_pricer(df, price_cols, date_col):
         The first row will contain NaNs due to first diferentiation.
     """
 
-    assert ptypes.is_datetime64_any_dtype(df[date_col]), "date column is not of type datetime"
-    assert all(ptypes.is_numeric_dtype(df[col]) for col in price_cols), "one or more price column is not numeric"
-    assert df.isnull().any().sum() == 0, "NaNs found on the dataset"
+    sorter = lambda df, date_col: df.sort_values(by=date_col).reset_index(drop=True)
+    log_transformer = lambda df, price_cols: df.assign(**{col: np.log(df[col]) for col in price_cols})
+    log_differ = lambda df, price_cols: df.assign(**{col: 100 * (df[col] - df[col].shift(1)) for col in price_cols})
 
-    new_df = df.sort_values(by=date_col)
-    new_df.index = df.index
-    new_df[price_cols] = np.log(new_df[price_cols])
-    new_df[price_cols] = 100 * (new_df[price_cols] - new_df[price_cols].shift(1))
-    return new_df
+    tranformations = compose(partial(log_differ, price_cols=price_columns),
+                             partial(log_transformer, price_cols=price_columns),
+                             partial(sorter, date_col=date_column))
+
+    def p(new_df):
+        return tranformations(new_df)
+
+    return p, p(dataset)
 
 
 @curry
@@ -79,12 +81,11 @@ def time_split_dataset(df, train_start_date, train_end_date, holdout_end_date, d
     test_set : pandas.DataFrame
         The out of time testing set.
     """
-    assert ptypes.is_datetime64_any_dtype(df[date_col]), "date column is not of type datetime"
 
-    train_set = df[
+    train_set = df.copy()[
         (df[date_col] >= train_start_date) & (df[date_col] <= train_end_date)]
 
-    test_set = df[
+    test_set = df.copy()[
         (df[date_col] > train_end_date) & (df[date_col] <= holdout_end_date)]
 
     return train_set, test_set
