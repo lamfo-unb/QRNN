@@ -1,5 +1,17 @@
 import numpy as np
-from toolz import curry, compose, partial
+from toolz.curried import *
+
+def lagg_3d(dataset, n_lags, price_columns):
+
+    def p(new_df):
+        return pipe(price_columns,
+                    map(lambda col: [new_df[col].shift(-lag).tolist() for lag in range(n_lags)]),
+                    compose(np.array, list),
+                    partial(np.transpose, axes=(2, 1, 0)))
+
+    return p, p(dataset)
+
+
 
 @curry
 def diff_log_pricer(dataset, price_columns, date_column):
@@ -26,16 +38,18 @@ def diff_log_pricer(dataset, price_columns, date_column):
         The first row will contain NaNs due to first diferentiation.
     """
 
-    sorter = lambda df, date_col: df.sort_values(by=date_col).reset_index(drop=True)
-    log_transformer = lambda df, price_cols: df.assign(**{col: np.log(df[col]) for col in price_cols})
-    log_differ = lambda df, price_cols: df.assign(**{col: 100 * (df[col] - df[col].shift(1)) for col in price_cols})
-
-    tranformations = compose(partial(log_differ, price_cols=price_columns),
-                             partial(log_transformer, price_cols=price_columns),
-                             partial(sorter, date_col=date_column))
-
     def p(new_df):
-        return tranformations(new_df)
+        # Sorting the dataframe
+        sort_fn = lambda df: df.sort_values(by=date_column)
+
+        # Applying log to each value
+        log_fn = lambda df: df.assign(**{col: np.log(df[col]) for col in price_columns})
+
+        # Calculating the difference
+        diff_fn = lambda df: df.assign(
+            **{col: 100 * (df[col] - df[col].shift(1)) for col in price_columns}).reset_index(drop=True)
+
+        return compose(diff_fn, log_fn, sort_fn)(new_df)
 
     return p, p(dataset)
 
