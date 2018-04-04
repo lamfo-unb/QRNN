@@ -48,10 +48,3 @@ def quantile_loss_evaluator( df , predict_col , target_col , tau ):
 def proportion_of_hits_evaluator(df , predict_col , target_col ):
     
     return np.mean(df[predict_col] > df[target_col])
-
-# testing
-df_data = pd.DataFrame(np.random.randint(low=0, high=10, size=(5, 2)),columns=['Y_hat','Y_Tru'])
-#print(df_data.head())
-
-print(quantile_loss_evaluator(df_data,'Y_hat','Y_Tru',0.5))
-print(proportion_of_hits_evaluator(df_data,'Y_hat','Y_Tru'))
