@@ -35,12 +35,8 @@ def quantile_loss_evaluator( df , predict_col , target_col , tau ):
     # assigning the values
     y_hat = df[predict_col]
     y_tru = df[target_col]
-    
-    # Calculating
-    quantile_loss = { str(tau) : sum((tau - (y_tru - y_hat )) * (y_hat)) }
-    
     # Returning a dictionary with the quartile and the loss
-    return quantile_loss
+    return np.mean((tau - (y_tru < y_hat )) * (y_tru - y_hat))
 
 
 
