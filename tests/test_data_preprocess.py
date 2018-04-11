@@ -1,43 +1,46 @@
 import pandas as pd
-import numpy as np
 from numpy import nan
 
-def test_lagg_3d():
-    from qrnn.data_preprocess import lagg_3d
 
-    # can assume a sorted DF
-    df_sorted = pd.DataFrame({
-        'date': pd.to_datetime(["2017-01-01", "2017-01-02", "2017-01-03", "2017-01-04", "2017-01-05", "2017-01-06"]),
-        'price1': [100, 102, 94, 105, 103, 97],
-        "price2": [1010, 1022, 500, 501, 786, 800]
+def test_clean_nan():
+    from qrnn.data_preprocess import clean_nan
+    df = pd.DataFrame({
+        'date': pd.to_datetime(["2017-01-01", "2017-01-02", nan, "2017-01-04"]),
+        'price1': [100.0, 102.0, 94.0, nan],
+        "price2": [1010.0, 1022.0, 500.0, 501.0]
     })
 
-    expected = np.array([[[100., 1010.],
-                          [102., 1022]],
+    expected = pd.DataFrame({
+        'date': pd.to_datetime(["2017-01-01", "2017-01-02"]),
+        'price1': [100.0, 102.0],
+        "price2": [1010.0, 1022.0]
+    })
 
-                         [[102., 1022],
-                          [94., 500.]],
+    result = clean_nan(df)
+    assert result.equals(expected), "clean_nan not working"
 
-                         [[94., 500.],
-                          [105., 501.]],
+def test_lagger():
+    from qrnn.data_preprocess import lagger
+    df = pd.DataFrame({
+        'date': pd.to_datetime(["2017-01-01", "2017-01-02", "2017-01-03", "2017-01-04"]),
+        'price1': [100.0, 102.0, 94.0, 105.0],
+        "price2": [1010.0, 1022.0, 500.0, 501.0]
+    })
 
-                         [[105., 501.],
-                          [103., 786.]],
+    expected = pd.DataFrame({
+        'date': pd.to_datetime(["2017-01-01", "2017-01-02", "2017-01-03", "2017-01-04"]),
+        'price1':  [100.0,  102.0,  94.0,  105.0],
+        'price11': [102.0,  94.0,   105,   nan],
+        'price12': [94.0,   105.0,  nan,   nan],
+        "price2":  [1010.0, 1022.0, 500.0, 501.0],
+        "price21": [1022.0, 500.0,  501.0, nan],
+        "price22": [500.0,  501.0,  nan, nan]
+    })
 
-                         [[103., 786.],
-                          [97., 800.]],
-
-                         [[97., 800.],
-                          [nan, nan]]])
-
-    lagger_fn, _ = lagg_3d(dataset=df_sorted,
-                           n_lags=2,
-                           price_columns=["price1", "price2"])
-
-    result = lagger_fn(df_sorted)
-
-    assert result.shape == (6,2,2), "result shape is wrong"
-    np.testing.assert_array_almost_equal(expected, result)
+    lagg_fn = lagger(n_lags=2, price_columns=['price1', 'price2'])
+    result = lagg_fn(df)
+    print(result)
+    assert result.equals(expected), "lagger not working"
 
 def test_diff_log_pricer():
     from qrnn.data_preprocess import diff_log_pricer
@@ -63,9 +66,8 @@ def test_diff_log_pricer():
         "price2": [None, 100 * (log(1022) - log(1010)), 100 * (log(500) - log(1022)), 100 * (log(501) - log(500))]
     })
 
-    difflog_fn, _ = diff_log_pricer(dataset=df_sorted,
-                                    price_columns=["price1", "price2"],
-                                    date_column="date")
+    difflog_fn = diff_log_pricer(price_columns=["price1", "price2"],
+                                 date_column="date")
 
     result_sorted = difflog_fn(df_sorted)
     result_not_sorted = difflog_fn(df_not_sorted)

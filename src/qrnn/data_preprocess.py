@@ -1,34 +1,38 @@
 import numpy as np
 from toolz.curried import *
 
-def lagg_3d(dataset, n_lags, price_columns):
 
-    def p(new_df):
-        return pipe(price_columns,
-                    map(lambda col: [new_df[col].shift(-lag).tolist() for lag in range(n_lags)]),
-                    compose(np.array, list),
-                    partial(np.transpose, axes=(2, 1, 0)))
+@curry
+def clean_nan(dataset, how='any'):
+    return dataset.dropna(how=how)
 
-    return p, p(dataset)
 
+@curry
+def lagger(dataset, n_lags, price_columns):
+    df = reduce(
+        lambda df, lag: df.assign(**{col + str(lag): dataset[[col]].shift(-lag).values for col in price_columns}),
+        range(1, n_lags + 1),
+        dataset[price_columns])
+
+    result = df.assign(**{col: dataset[col] for col in dataset.drop(price_columns, axis=1).columns})
+    return result[sorted(result.columns)]
 
 
 @curry
 def diff_log_pricer(dataset, price_columns, date_column):
     """
-    Splits temporal data into a training and testing datasets such that
-    all training data comes before the testings one.
+    Takes the first difference of the logs of temporal data
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    dataset : pandas.DataFrame
         A Pandas' DataFrame with a Date Column and one or many price column.
         The price column must be of numerical time and not contain nones
 
-    price_cols : list of str
+    price_columns : list of str
         A list with the names of the price columns
 
-    date_col : str
+    date_column : str
         The name of the date column. The column must be of type datetime.
 
     Returns
@@ -38,20 +42,17 @@ def diff_log_pricer(dataset, price_columns, date_column):
         The first row will contain NaNs due to first diferentiation.
     """
 
-    def p(new_df):
-        # Sorting the dataframe
-        sort_fn = lambda df: df.sort_values(by=date_column)
+    # Sorting the dataframe
+    sort_fn = lambda df: df.sort_values(by=date_column)
 
-        # Applying log to each value
-        log_fn = lambda df: df.assign(**{col: np.log(df[col]) for col in price_columns})
+    # Applying log to each value
+    log_fn = lambda df: df.assign(**{col: np.log(df[col]) for col in price_columns})
 
-        # Calculating the difference
-        diff_fn = lambda df: df.assign(
-            **{col: 100 * (df[col] - df[col].shift(1)) for col in price_columns}).reset_index(drop=True)
+    # Calculating the difference
+    diff_fn = lambda df: df.assign(
+        **{col: 100 * (df[col] - df[col].shift(1)) for col in price_columns}).reset_index(drop=True)
 
-        return compose(diff_fn, log_fn, sort_fn)(new_df)
-
-    return p, p(dataset)
+    return compose(diff_fn, log_fn, sort_fn)(dataset)
 
 
 @curry
