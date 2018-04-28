@@ -7,6 +7,7 @@ from keras.layers import Dense, LSTM
 from keras.optimizers import Adam
 from qrnn.evaluation import quantile_loss_evaluator
 
+
 # TODO : Implement recurrent variational dropout
 
 def qrnn_learner(dataset, price_cols, target_col, prediction_col="prediction",
@@ -49,36 +50,34 @@ def qrnn_learner(dataset, price_cols, target_col, prediction_col="prediction",
 
     return p, p(dataset)
 
-def adaptive(dataset,price_cols, target_col, prediction_col, tau):  
 
-    
+def adaptive(dataset, price_cols, target_col, prediction_col, tau):
     from scipy.stats import norm
     from scipy.optimize import brent
-    #initializing VaR arrays
-    
-    VaR_train = np.zeros(len(dataset))
-    
-    VaR_train[0] = - norm.ppf(tau) * np.std(dataset[price_cols])
 
+    # initializing VaR arrays
+    VaR_train = np.zeros(len(dataset))
+
+    initialVaR = - norm.ppf(tau) * np.std(dataset[price_cols])
+    VaR_train[0] = initialVaR
 
     def adaptative(beta):
-        for i in range(1,len(dataset)):
-            VaR_train[i] = VaR_train[i-1] + beta*((dataset[price_cols].iloc[i-1] < - VaR_train[i-1]) - tau ) 
+        for i in range(1, len(dataset)):
+            VaR_train[i] = VaR_train[i - 1] + beta * ((dataset[price_cols].iloc[i - 1] < - VaR_train[i - 1]) - tau)
 
-        VaRdataset = dataset.assign(**{prediction_col:VaR_train})
-        return quantile_loss_evaluator(VaRdataset, price_cols, prediction_col,tau)  
+        VaRdataset = dataset.assign(**{prediction_col: VaR_train})
+        return quantile_loss_evaluator(VaRdataset, price_cols, prediction_col, tau)
 
-   #beta that minimizes loss   
-    beta_opt = brent(adaptative, brack=(-100,100))
+        # beta that minimizes loss
 
+    beta_opt = brent(adaptative, brack=(-100, 100))
 
     def p(new_dataset):
         VaR = np.zeros(len(new_dataset))
-        VaR[0] = - norm.ppf(tau) * np.std(new_dataset[price_cols])
-        for i in range(1,len(new_dataset)):
-            VaR[i] = VaR[i-1] + beta_opt*((new_dataset[price_cols].iloc[i-1] < - VaR[i-1]) - tau ) 
-        
-        return new_dataset.assign(**{prediction_col:VaR})
-        
+        VaR[0] = initialVaR
+        for i in range(1, len(new_dataset)):
+            VaR[i] = VaR[i - 1] + beta_opt * ((new_dataset[price_cols].iloc[i - 1] < - VaR[i - 1]) - tau)
 
-    return p,p(dataset)
+        return new_dataset.assign(**{prediction_col: VaR})
+
+    return p, p(dataset)
