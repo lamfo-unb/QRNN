@@ -6,6 +6,9 @@ from toolz.curried import *
 def clean_nan(dataset, how='any'):
     return dataset.dropna(how=how)
 
+@curry
+def fill_nan(dataset, method="ffill"):
+    return dataset.fillna(method=method)
 
 @curry
 def lagger(dataset, n_lags, price_columns):
