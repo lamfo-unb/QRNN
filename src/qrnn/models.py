@@ -3,7 +3,7 @@ from toolz.curried import *
 import tensorflow as tf
 import numpy as np
 from keras.models import Sequential
-from keras.layers import Dense, LSTM
+from keras.layers import Dense, LSTM, Dropout
 from keras.optimizers import Adam
 from keras import backend as K
 from qrnn.evaluation import quantile_loss_evaluator
@@ -12,6 +12,7 @@ from qrnn.evaluation import quantile_loss_evaluator
 def qrnn_learner(dataset, price_cols, target_col, target_lag, prediction_col="prediction",
                  tau=0.05, neurons=20, lr=1e-4, batch_size=512, epochs=5, dropout=0.1,
                  stocastic_pass=100, return_variance=True):
+
     def to_3D(dataset):
         all_p_columns = pipe(dataset.columns,
                              filter(lambda col: reduce(lambda acc, p_col: acc or col.find(p_col) >= 0,

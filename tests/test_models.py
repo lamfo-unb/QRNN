@@ -20,20 +20,23 @@ def test_qrnn_learner():
     })
 
     model, pred_train = qrnn_learner(dataset=train,
-                                     price_cols=["price1", "price2"],
+                                     price_cols=["price"],
                                      target_col="y",
-                                     prediction_col="prediction")
+                                     target_lag=2)
+
 
     pred_test = model(test)
 
-    expected_col_train = train.columns.tolist() + ["prediction"]
-    expected_col_test = test.columns.tolist() + ["prediction"]
+    expected_col_train = train.columns.tolist() + ["prediction", "prediction_var"]
+    expected_col_test = test.columns.tolist() + ["prediction", "prediction_var"]
 
     # check if model is making a prediction column
     assert Counter(expected_col_train) == Counter(pred_train.columns.tolist())
     assert Counter(expected_col_test) == Counter(pred_test.columns.tolist())
 
+
 def test_adaptive():
+
     from qrnn.models import adaptive
 
     train = pd.DataFrame({
